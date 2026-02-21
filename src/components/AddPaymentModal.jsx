@@ -1,25 +1,33 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { addPayment } from "@/components/server";
 import Select from 'react-select'
+import { toast } from 'sonner';
+import { generateReceiptPDF } from './pdf/ReceiptPdf';
+
 
 export default function AddPaymentModal({ users = [], locations = [], onClose, onSubmit }) {
+
   const [selectedUser, setSelectedUser] = useState(null);
   const [selectedLocation, setSelectedLocation] = useState("all");
   const [filteredUsers, setFilteredUsers] = useState(users);
 
-  console.log(users);
-
-
+  // Get today's date in yyyy-mm-dd format
+  const todayStr = new Date().toISOString().split('T')[0];
 
   const [form, setForm] = useState({
     client_id: "",
     month: "",
     amount: "",
     payment_method: "",
-    payment_date: "",
+    payment_date: todayStr,
   });
-console.log(selectedUser);
+  const [loading, setLoading] = useState(false);
+  const [feedback, setFeedback] = useState(null);
+  const [createdPayment, setCreatedPayment] = useState(null);
+  const [downloading, setDownloading] = useState(false);
+  const [printing, setPrinting] = useState(false);
 
   const months = [
     "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
@@ -33,10 +41,57 @@ console.log(selectedUser);
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e) => {
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    onSubmit(form);
-    onClose();
+    setLoading(true);
+    setFeedback(null);
+    // Always use form.amount if present, otherwise fallback to selectedUser.package_price
+    const amount = form.amount || (selectedUser ? selectedUser.package_price : "");
+    const paymentData = `
+    ${form.payment_date.split('-').reverse().join('-')}-${amount}-${form.payment_method}`;
+    const formToSubmit = {
+      client_id: form.client_id,
+      month: form.month,
+      payment_data: paymentData,
+    };
+    try {
+      const res = await addPayment(formToSubmit);
+      if (res.success) {
+        setFeedback({ type: "success", message: res.message || "Payment added successfully!" });
+        if (onSubmit) onSubmit();
+        // keep modal open and expose receipt actions
+        const paidAmount = form.amount || (selectedUser ? selectedUser.package_price : "");
+        const paymentObj = {
+          client_id: form.client_id,
+          month: form.month,
+          amount: paidAmount,
+          payment_method: form.payment_method,
+          payment_date: form.payment_date,
+        };
+        setCreatedPayment(paymentObj);
+        setLoading(false);
+      } else {
+        setFeedback({ type: "error", message: res.message || "Failed to add payment." });
+        setLoading(false);
+      }
+    } catch (err) {
+      setFeedback({ type: "error", message: err.message || "Failed to add payment." });
+      setLoading(false);
+    }
+  };
+
+  // Clear form and selected user
+  const handleClear = () => {
+    setSelectedUser(null);
+    setForm({
+      client_id: "",
+      month: "",
+      amount: "",
+      payment_method: "",
+      payment_date: todayStr,
+    });
+    setCreatedPayment(null);
   };
 
   // Helper to get months between two dates (inclusive)
@@ -73,7 +128,35 @@ console.log(selectedUser);
     clientMonths = getMonthsRange(startMonth, startYear, endMonth, endYear);
     paidMonths = selectedUser.payments || {};
   }
+  // console.log("datasss", clientMonths);
 
+
+  // Helper to format date as DD-MM-YYYY
+  function formatDate(date) {
+    const d = new Date(date);
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}-${month}-${year}`;
+  }
+
+
+  // Reset all state when users prop changes (e.g. after payment add)
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setFilteredUsers(users);
+    setSelectedUser(null);
+    setSelectedLocation("all");
+    setForm({
+      client_id: "",
+      month: "",
+      amount: "",
+      payment_method: "",
+      payment_date: todayStr,
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [users]);
+  
   return (
     <dialog id="add-payment-modal" className="modal">
       <div className="modal-box max-w-4xl rounded-2xl shadow-xl bg-white border-t-4 border-success p-8 relative">
@@ -99,7 +182,9 @@ console.log(selectedUser);
                   <span className="font-bold">Location:</span> {selectedUser.location}<br />
                   <span className="font-bold">Address:</span> {selectedUser.address}<br />
                   <span className="font-bold">Phone:</span> {selectedUser.phone}<br />
-                  <span className="font-bold">Package:</span> {selectedUser.package_name} ({selectedUser.package_price})<br />
+                  <span className="font-bold">Package:</span> {selectedUser.package_name} <br />
+                  <span className="font-bold">Package Price:</span> {selectedUser.package_price}<br />
+                  <span className="font-bold">Starting Date:</span> {formatDate(selectedUser.starting_date)}<br />
                   <span className="font-bold">Total Due:</span> {selectedUser.total_due}<br />
                   <span className="font-bold">Total Paid:</span> {selectedUser.total_paid}<br />
                   <span className="font-bold">Notes:</span> {selectedUser.notes}
@@ -107,18 +192,71 @@ console.log(selectedUser);
                 <div className="mt-4">
                   <span className="font-bold">Payment Status:</span>
                   <div className="flex flex-wrap gap-2 mt-2">
-                    {clientMonths.map(({ month, year }) => {
-                      const paid = paidMonths[month] && paidMonths[month] !== "";
-                      return (
-                        <span
-                          key={month + year}
-                          className={`badge px-3 py-1 text-xs font-semibold ${paid ? 'bg-green-200 text-green-800' : 'bg-red-200 text-red-800'}`}
-                        >
-                          {month} {year} {paid ? 'Paid' : 'Unpaid'}
-                        </span>
-                      );
-                    })}
+                    {selectedUser &&
+                      (() => {
+                        const now = new Date();
+                        const currentYear = now.getFullYear();
+                        const currentMonthIndex = now.getMonth();
+
+                        // Determine effective start month
+                        let startMonth = 0;
+                        if (selectedUser.starting_date) {
+                          const sd = new Date(selectedUser.starting_date);
+                          if (!isNaN(sd) && sd.getFullYear() === currentYear) {
+                            startMonth = sd.getMonth();
+                          }
+                        }
+
+                        const payments = selectedUser.payments || [];
+
+                        return months.map((month, index) => {
+                          // Skip months before starting month
+                          if (index < startMonth) return null;
+
+                          const value = payments[month];
+                          const isPaid =
+                            value &&
+                            value.toString().trim() !== "" &&
+                            value.toString().toLowerCase() !== "due";
+
+                          let status = "";
+                          let badgeClass = "";
+
+                          // 🔴 DUE
+                          if (index <= currentMonthIndex && !isPaid) {
+                            status = "Due";
+                            badgeClass = "bg-red-200 text-red-800";
+                          }
+
+                          // 🟢 PAID
+                          else if (index <= currentMonthIndex && isPaid) {
+                            status = "Paid";
+                            badgeClass = "bg-green-200 text-green-800";
+                          }
+
+                          // 🔵 ADVANCE PAID
+                          else if (index > currentMonthIndex && isPaid) {
+                            status = "Advance";
+                            badgeClass = "bg-blue-200 text-blue-800";
+                          }
+
+                          // Ignore unpaid future months
+                          else {
+                            return null;
+                          }
+
+                          return (
+                            <span
+                              key={month}
+                              className={`badge px-3 py-1 text-xs font-semibold ${badgeClass}`}
+                            >
+                              {month} {status}
+                            </span>
+                          );
+                        });
+                      })()}
                   </div>
+
                 </div>
               </div>
             ) : (
@@ -132,7 +270,7 @@ console.log(selectedUser);
               {/* filter */}
               <select
                 name="location"
-                className="select select-bordered min-w-[150px] w-fit  bg-gray-50"
+                className="select select-bordered min-w-37.5 w-fit  bg-gray-50"
                 value={selectedLocation}
                 onChange={(e) => {
                   setSelectedLocation(e.target.value);
@@ -154,16 +292,20 @@ console.log(selectedUser);
                   value: u.client_id,
                   label: `${u.name} (${u.client_id})`
                 }))}
-                value={filteredUsers
-                  .map(u => ({
-                    value: u.client_id,
-                    label: `${u.name} (${u.client_id})`
-                  }))
-                  .find(option => option.value === form.client_id) || null}
+                // value={filteredUsers
+                //   .map(u => ({
+                //     value: u.client_id,
+                //     label: `${u.name} (${u.client_id})`
+                //   }))
+                //   .find(option => option.value === form.client_id) || null}
                 onChange={(selectedOption) => {
                   const user = filteredUsers.find(u => u.client_id === (selectedOption ? selectedOption.value : null)) || null;
                   setSelectedUser(user);
-                  setForm((prev) => ({ ...prev, client_id: selectedOption ? selectedOption.value : "" }))
+                  setForm((prev) => ({
+                    ...prev,
+                    client_id: selectedOption ? selectedOption.value : "",
+                    amount: user && user.package_price ? user.package_price : ""
+                  }));
                 }}
                 instanceId="add-payment-client-select"
                 inputId="add-payment-client-input"
@@ -234,9 +376,148 @@ console.log(selectedUser);
                 ))}
               </select>
             </div>
-            <button type="submit" className="btn btn-success w-full mt-2">
-              Add Payment
-            </button>
+            <div className="flex flex-col sm:flex-row gap-3 mt-2 w-full">
+              <button type="submit" className="btn btn-success flex-1 flex items-center justify-center" disabled={loading}>
+                {loading ? (
+                  <span className="flex items-center gap-2">
+                    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+                    </svg>
+                    Processing...
+                  </span>
+                ) : (
+                  "Add Payment"
+                )}
+              </button>
+              <button type="button" className="btn btn-outline flex-1" onClick={handleClear} disabled={loading}>
+                Clear
+              </button>
+            </div>
+            {feedback && (
+              <div className={`mt-2 text-center rounded-lg py-2 px-3 font-semibold ${feedback.type === "success" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                {feedback.message}
+              </div>
+            )}
+            {createdPayment && (
+              <div className="mt-6 pt-4 border-t">
+                <p className="text-sm text-success font-medium mb-3 text-center">
+                  Payment recorded. You can download or print the receipt.
+                </p>
+
+                <div className="flex flex-wrap justify-center gap-3">
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm"
+                    onClick={async () => {
+                      try {
+                        setDownloading(true);
+                        const user = selectedUser || users.find(u => u.client_id === createdPayment.client_id);
+                        const blob = await generateReceiptPDF(user, createdPayment);
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `receipt_${(user && user.client_id) || createdPayment.client_id}_${createdPayment.month}.pdf`;
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                        URL.revokeObjectURL(url);
+                        toast.success('Receipt downloaded');
+                      } catch (err) {
+                        toast.error('Failed to generate receipt');
+                      } finally {
+                        setDownloading(false);
+                      }
+                    }}
+                    disabled={downloading}
+                  >
+                    {downloading ? 'Preparing…' : 'Download Receipt'}
+                  </button>
+                  {/* print */}
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm"
+                    onClick={async () => {
+                      try {
+                        setPrinting(true);
+                        const user = selectedUser || users.find(u => u.client_id === createdPayment.client_id);
+                        const blob = await generateReceiptPDF(user, createdPayment);
+                        const url = URL.createObjectURL(blob);
+                        const printWindow = window.open(url, '_blank');
+                        printWindow.onload = () => {
+                          printWindow.focus();
+                          printWindow.print();
+                        };
+                      } catch (err) {
+                        toast.error('Failed to print receipt: ' + (err?.message || err));
+                      }
+                      finally {
+                        setPrinting(false);
+                      }
+                    }}
+                    disabled={printing}
+                  >
+                    {printing ? 'Printing…' : 'Print Receipt'}
+                  </button>
+
+                  {/* <button
+                    type="button"
+                    className="btn btn-outline btn-sm"
+                    onClick={async () => {
+                      try {
+                        setPrinting(true);
+                        const user = selectedUser || users.find(u => u.client_id === createdPayment.client_id);
+                        const blob = await generateReceiptPDF(user, createdPayment);
+                        const url = URL.createObjectURL(blob);
+
+                        const iframe = document.createElement('iframe');
+                        iframe.style.position = 'fixed';
+                        iframe.style.right = '0';
+                        iframe.style.bottom = '0';
+                        iframe.style.width = '0';
+                        iframe.style.height = '0';
+                        iframe.style.border = '0';
+                        iframe.src = url;
+
+                        document.body.appendChild(iframe);
+
+                        iframe.onload = () => {
+                          try {
+                            iframe.contentWindow.focus();
+                            iframe.contentWindow.print();
+                          } catch {
+                            toast.error('Print failed');
+                          }
+
+                          setTimeout(() => {
+                            URL.revokeObjectURL(url);
+                            document.body.removeChild(iframe);
+                          }, 1000);
+                        };
+                      } catch (err) {
+                        toast.error('Failed to print receipt: ' + (err?.message || err));
+                      } finally {
+                        setPrinting(false);
+                      }
+                    }}
+                    disabled={printing}
+                  >
+                    {printing ? 'Printing…' : 'Print Receipt'}
+                  </button> */}
+
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    onClick={() => {
+                      setCreatedPayment(null);
+                      onClose();
+                    }}
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            )}
           </form>
         </div>
 

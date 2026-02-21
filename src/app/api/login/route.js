@@ -18,7 +18,7 @@ export async function POST(req) {
 
 	const { username, password, remember } = body || {};
 
-	if (username !== "admin" || password !== "1234") {
+	if (username.trim() !== "admin" || password.trim() !== "1234") {
 		return NextResponse.json({ success: false }, { status: 401 });
 	}
 
