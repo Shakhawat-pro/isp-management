@@ -159,7 +159,7 @@ export default function AddPaymentModal({ users = [], locations = [], onClose, o
   
   return (
     <dialog id="add-payment-modal" className="modal">
-      <div className="modal-box max-w-4xl rounded-2xl shadow-xl bg-white border-t-4 border-success p-8 relative">
+      <div className="modal-box max-w-4xl max-h-11/12 rounded-2xl shadow-xl bg-white border-t-4 border-success p-4 sm:p-8 relative">
         <button
           className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2"
           onClick={onClose}
@@ -171,9 +171,9 @@ export default function AddPaymentModal({ users = [], locations = [], onClose, o
           <span className="text-2xl font-extrabold text-success mb-1">Add Payment</span>
           <span className="badge badge-success/20 text-success font-semibold">Payment Entry</span>
         </div>
-        <div className="flex gap-8">
+        <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
           {/* Client detail */}
-          <div className="max-w-[40%] w-full">
+          <div className="w-full lg:max-w-[40%]">
             {selectedUser ? (
               <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
                 <div className="mb-2">
@@ -264,13 +264,13 @@ export default function AddPaymentModal({ users = [], locations = [], onClose, o
             )}
           </div>
 
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4  w-full max-w-[60%]">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4 w-full lg:max-w-[60%]">
             {/* Filter */}
-            <div className="flex items-center gap-5 w-full ">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-5 w-full">
               {/* filter */}
               <select
                 name="location"
-                className="select select-bordered min-w-37.5 w-fit  bg-gray-50"
+                className="select select-bordered w-full sm:w-fit bg-gray-50"
                 value={selectedLocation}
                 onChange={(e) => {
                   setSelectedLocation(e.target.value);
@@ -377,7 +377,7 @@ export default function AddPaymentModal({ users = [], locations = [], onClose, o
               </select>
             </div>
             <div className="flex flex-col sm:flex-row gap-3 mt-2 w-full">
-              <button type="submit" className="btn btn-success flex-1 flex items-center justify-center" disabled={loading}>
+              <button type="submit" className="btn btn-success flex-1 flex items-center justify-center py-2" disabled={loading}>
                 {loading ? (
                   <span className="flex items-center gap-2">
                     <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -390,7 +390,7 @@ export default function AddPaymentModal({ users = [], locations = [], onClose, o
                   "Add Payment"
                 )}
               </button>
-              <button type="button" className="btn btn-outline flex-1" onClick={handleClear} disabled={loading}>
+              <button type="button" className="btn btn-outline flex-1 py-2" onClick={handleClear} disabled={loading}>
                 Clear
               </button>
             </div>
@@ -408,7 +408,7 @@ export default function AddPaymentModal({ users = [], locations = [], onClose, o
                 <div className="flex flex-wrap justify-center gap-3">
                   <button
                     type="button"
-                    className="btn btn-outline btn-sm"
+                    className="btn btn-outline btn-sm py-2"
                     onClick={async () => {
                       try {
                         setDownloading(true);
@@ -436,7 +436,7 @@ export default function AddPaymentModal({ users = [], locations = [], onClose, o
                   {/* print */}
                   <button
                     type="button"
-                    className="btn btn-outline btn-sm"
+                    className="btn btn-outline btn-sm py-2"
                     onClick={async () => {
                       try {
                         setPrinting(true);
@@ -462,7 +462,7 @@ export default function AddPaymentModal({ users = [], locations = [], onClose, o
 
                   {/* <button
                     type="button"
-                    className="btn btn-outline btn-sm"
+                    className="btn btn-outline btn-sm py-2"
                     onClick={async () => {
                       try {
                         setPrinting(true);
@@ -507,7 +507,7 @@ export default function AddPaymentModal({ users = [], locations = [], onClose, o
 
                   <button
                     type="button"
-                    className="btn btn-primary btn-sm"
+                    className="btn btn-primary btn-sm py-2"
                     onClick={() => {
                       setCreatedPayment(null);
                       onClose();

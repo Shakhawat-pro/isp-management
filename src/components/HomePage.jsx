@@ -213,7 +213,7 @@ const HomePage = ({ initialData }) => {
                         </div>
                     </div>
                     {/* User Details Section */}
-                    <div className="w-full max-w-[70%]">
+                    <div className="w-full lg:max-w-[70%]">
                         <div className="bg-white shadow border border-gray-200 min-h-75 rounded-lg p-6">
                             <UserDetails user={selectedUser} />
                         </div>

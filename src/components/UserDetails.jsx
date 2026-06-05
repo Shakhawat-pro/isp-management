@@ -195,7 +195,7 @@ const UserDetails = ({ user }) => {
                 <h3 className="text-lg font-semibold mb-2">Monthly Payment Status</h3>
                 <div className="flex flex-col items-center w-full">
                     <div
-                        className="grid grid-cols-4 grid-rows-3 gap-4 w-full max-w-2xl bg-slate-50 p-4 rounded-xl shadow-sm"
+                        className="grid grid-cols-2 md:grid-cols-4 grid-rows-3 gap-4 w-full max-w-2xl bg-slate-50 p-4 rounded-xl shadow-sm"
                         style={{ width: '100%', minWidth: 0 }}
                     >
                         {MONTH_NAMES.map((month, idx) => {
