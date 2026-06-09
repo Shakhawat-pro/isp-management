@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { generateUserPDF } from './pdf/UserPdf';
+import { formatDisplayDate } from '@/lib/dateUtils';
 
 const MONTH_NAMES = [
     "January", "February", "March", "April", "May", "June",
@@ -184,7 +185,7 @@ const UserDetails = ({ user }) => {
                     <div><span className="font-semibold">Phone:</span> {user.phone}</div>
                     <div><span className="font-semibold">Address:</span> {user.address}</div>
                     <div><span className="font-semibold">Package:</span> {user.package_name} ({user.package_price}৳)</div>
-                    <div><span className="font-semibold">Joined:</span> {user.starting_date}</div>
+                    <div><span className="font-semibold">Joined:</span> {formatDisplayDate(user.starting_date)}</div>
                     <div><span className="font-semibold text-success">Paid:</span> <span className="text-base font-bold text-success">{user.total_paid}৳</span></div>
                     <div><span className="font-semibold text-success">Advance:</span> <span className="text-base font-bold text-success">{user.advance_payment}৳</span></div>
                     <div><span className="font-semibold text-warning">Due:</span> <span className="text-base font-bold text-warning">{user.total_due}৳</span></div>
@@ -206,7 +207,7 @@ const UserDetails = ({ user }) => {
                             if (value && value !== '' && value.toLowerCase() !== 'due') {
                                 paid = true;
                                 const parts = value.replace(/^paid-/, '').split('-');
-                                date = parts.slice(0, 3).join('-');
+                                date = formatDisplayDate(parts.slice(0, 3).join('-'));
                                 amount = parts[3] || '';
                                 method = parts[4] || '';
                             }

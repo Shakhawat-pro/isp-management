@@ -2,39 +2,12 @@
 
 import { sheets, SPREADSHEET_ID } from "@/lib/googleSheets";
 import { revalidatePath } from "next/cache";
+import { formatStorageDate, parseFlexibleDate } from "@/lib/dateUtils";
 
 const MONTHS = [
     "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
     "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"
 ];
-
-const parseStartDate = (value) => {
-    if (!value) return null;
-    if (value instanceof Date && !Number.isNaN(value)) return value;
-
-    const text = value.toString().replace(/"/g, "").trim();
-    if (!text) return null;
-
-    let match = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-    if (match) {
-        const year = Number(match[1]);
-        const month = Number(match[2]);
-        const day = Number(match[3]);
-        return new Date(year, month - 1, day);
-    }
-
-    match = text.match(/^(\d{1,2})-(\d{1,2})-(\d{2,4})$/);
-    if (match) {
-        let year = Number(match[3]);
-        if (year < 100) year += 2000;
-        const month = Number(match[2]);
-        const day = Number(match[1]);
-        return new Date(year, month - 1, day);
-    }
-
-    const fallback = new Date(text);
-    return Number.isNaN(fallback) ? null : fallback;
-};
 
 const parsePaymentAmount = (value) => {
     if (!value) return 0;
@@ -150,7 +123,7 @@ export const getAllClients = async () => {
 
         const clients = rows.map((row, index) => {
             const package_price = parseFloat(row[7]) || 0;
-            const starting_date = parseStartDate(row[8]);
+            const starting_date = parseFlexibleDate(row[8]);
 
             // ▶ Determine effective start month
             let effectiveStartMonth = 0;
@@ -259,6 +232,7 @@ export const getAllClients = async () => {
 export const addNewClient = async ({ clientData }) => {
     try {
         const { name, client_id, location, address, phone, package_name, package_price, starting_date } = clientData;
+        const storedStartingDate = formatStorageDate(starting_date);
 
         // Append user to Google Sheet
         await sheets.spreadsheets.values.append({
@@ -275,7 +249,7 @@ export const addNewClient = async ({ clientData }) => {
                     phone,
                     package_name,
                     package_price,
-                    starting_date,
+                    storedStartingDate,
                 ]],
             },
         });

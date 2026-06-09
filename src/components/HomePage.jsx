@@ -9,6 +9,16 @@ import UserDetails from './UserDetails';
 import Statistics from './Statistics';
 import UserPDF from './pdf/UserPdf';
 import Fuse from 'fuse.js';
+import { formatDisplayDate, parseFlexibleDate } from '@/lib/dateUtils';
+
+const MONTH_NAMES = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+];
+const MONTH_CODES = [
+    "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+    "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"
+];
 
 // const locations = [
 //     { label: "All", value: "all" },
@@ -82,21 +92,67 @@ const HomePage = ({ initialData }) => {
             .map(([id, list]) => ({ id, list }));
     }, [initialData.clients]);
 
+    const parsePaymentAmount = (value) => {
+        if (!value) return 0;
+        const text = value.toString().replace(/"/g, "").trim();
+        if (!text) return 0;
+        if (text.toLowerCase() === "due") return 0;
+
+        const parts = text.split("-");
+        if (parts.length >= 4) {
+            const amount = parseFloat(parts[3]);
+            if (!Number.isNaN(amount)) return amount;
+        }
+
+        const fallback = parseFloat(text);
+        return Number.isNaN(fallback) ? 0 : fallback;
+    };
+
+    const mismatchGroups = useMemo(() => {
+        const clients = initialData.clients || [];
+        const currentYear = new Date().getFullYear();
+
+        return clients
+            .map((client) => {
+                const startDate = parseFlexibleDate(client?.starting_date);
+                if (!startDate || Number.isNaN(startDate)) return null;
+
+                const startYear = startDate.getFullYear();
+                const startMonth = startDate.getMonth();
+                const payments = client?.payments || {};
+
+                const mismatchedMonths = MONTH_CODES.filter((monthCode, monthIndex) => {
+                    const value = payments[monthCode];
+                    const paidAmount = parsePaymentAmount(value);
+                    if (paidAmount <= 0) return false;
+
+                    if (startYear === currentYear) {
+                        return monthIndex < startMonth;
+                    }
+
+                    if (startYear > currentYear) {
+                        return true;
+                    }
+
+                    return false;
+                });
+
+                if (mismatchedMonths.length === 0) return null;
+
+                return {
+                    ...client,
+                    mismatchedMonths,
+                };
+            })
+            .filter(Boolean);
+    }, [initialData.clients]);
+
     // console.log(filteredData);
 
 
     const openModal = (id) => document.getElementById(id).showModal();
     const closeModal = (id) => document.getElementById(id).close();
 
-    // Deterministic month helpers (avoid locale/timezone differences)
-    const MONTH_NAMES = [
-        "January", "February", "March", "April", "May", "June",
-        "July", "August", "September", "October", "November", "December"
-    ];
-    const MONTH_CODES = [
-        "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
-        "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"
-    ];
     const now = new Date();
     const currentMonthIndex = now.getMonth();
     const getCurrentMonthName = () => MONTH_NAMES[currentMonthIndex];
@@ -181,6 +237,78 @@ const HomePage = ({ initialData }) => {
                         </div>
                     </div>
                 )}
+
+                {/* Mismatch Groups */}
+                {mismatchGroups.length > 0 && (
+                    <div className="mb-10">
+                        <button
+                            className="w-full flex items-center justify-between bg-white shadow border-t-4 border-warning rounded px-4 py-3 font-semibold text-lg focus:outline-none"
+                            onClick={() => setStatsOpen((open) => !open)}
+                        >
+                            <span>Date Mismatch ({mismatchGroups.length})</span>
+                            <svg
+                                className={`w-6 h-6 transition-transform duration-300 ${statsOpen ? "rotate-180" : ""}`}
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                viewBox="0 0 24 24"
+                            >
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+                        <div
+                            style={{
+                                maxHeight: statsOpen ? 560 : 0,
+                                opacity: statsOpen ? 1 : 0,
+                                overflow: "hidden",
+                                transition: "max-height 0.4s cubic-bezier(0.4,0,0.2,1), opacity 0.3s"
+                            }}
+                        >
+                            <div className="bg-white shadow border border-gray-200 rounded mt-4">
+                                <div
+                                    className="max-h-96 overflow-y-auto p-4"
+                                    style={{
+                                        scrollbarWidth: "thin",
+                                        scrollbarColor: "rgba(156,163,175,0.6) transparent",
+                                    }}
+                                >
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                                        {mismatchGroups.map((client) => (
+                                            <div
+                                                key={client.no ?? `${client.client_id}-${client.name ?? "unknown"}`}
+                                                className="rounded-lg border border-gray-200 p-3"
+                                            >
+                                                <div className="flex items-center justify-between gap-3">
+                                                    <div>
+                                                        <div className="font-semibold text-base">{client.name || "(No name)"}</div>
+                                                        <div className="text-sm text-gray-500">ID: {client.client_id || "(Missing)"}</div>
+                                                    </div>
+                                                    <span className="text-xs text-gray-500 whitespace-nowrap">
+                                                        {client.mismatchedMonths.length} months
+                                                    </span>
+                                                </div>
+                                                <div className="mt-2 text-sm text-gray-600">
+                                                    Starting: {formatDisplayDate(client.starting_date) || "(Missing)"}
+                                                </div>
+                                                <div className="mt-2 flex flex-wrap gap-2">
+                                                    {client.mismatchedMonths.map((month) => (
+                                                        <span
+                                                            key={month}
+                                                            className="rounded-full border border-gray-300 px-2 py-0.5 text-xs text-gray-600"
+                                                        >
+                                                            {month}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+                
                 {/* Main Content */}
                 <div className="flex flex-col lg:flex-row gap-8">
                     {/* User List */}

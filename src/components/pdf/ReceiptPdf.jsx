@@ -9,6 +9,7 @@ import {
     pdf,
     Font,
 } from '@react-pdf/renderer';
+import { formatDisplayDate, parseFlexibleDate } from '@/lib/dateUtils';
 
 Font.register({
     family: 'NotoBengali',
@@ -128,7 +129,8 @@ const COMPANY = {
 };
 
 const ReceiptDocument = ({ user, payment }) => {
-    const receiptNo = `RC-${payment.payment_date ? new Date(payment.payment_date).getTime() : ''}`;
+    const receiptDate = parseFlexibleDate(payment.payment_date);
+    const receiptNo = `RC-${receiptDate ? receiptDate.getTime() : ''}`;
 
     return (
         <Document>
@@ -155,7 +157,7 @@ const ReceiptDocument = ({ user, payment }) => {
                     <View style={styles.row}>
                         <Text style={styles.label}>Date:</Text>
                         <Text style={styles.value}>
-                            {new Date(payment.payment_date).toLocaleDateString()}
+                            {formatDisplayDate(payment.payment_date)}
                         </Text>
                     </View>
                 </View>

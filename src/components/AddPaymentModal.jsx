@@ -5,6 +5,7 @@ import { addPayment } from "@/components/server";
 import Select from 'react-select'
 import { toast } from 'sonner';
 import { generateReceiptPDF } from './pdf/ReceiptPdf';
+import { formatDisplayDate, formatStorageDate, parseFlexibleDate } from "@/lib/dateUtils";
 
 
 export default function AddPaymentModal({ users = [], locations = [], onClose, onSubmit }) {
@@ -49,7 +50,7 @@ export default function AddPaymentModal({ users = [], locations = [], onClose, o
     // Always use form.amount if present, otherwise fallback to selectedUser.package_price
     const amount = form.amount || (selectedUser ? selectedUser.package_price : "");
     const paymentData = `
-    ${form.payment_date.split('-').reverse().join('-')}-${amount}-${form.payment_method}`;
+    ${formatStorageDate(form.payment_date)}-${amount}-${form.payment_method}`;
     const formToSubmit = {
       client_id: form.client_id,
       month: form.month,
@@ -114,9 +115,11 @@ export default function AddPaymentModal({ users = [], locations = [], onClose, o
     let startYear = new Date().getFullYear();
     let startMonth = 0;
     if (selectedUser.starting_date) {
-      const d = new Date(selectedUser.starting_date);
-      startYear = d.getFullYear();
-      startMonth = d.getMonth();
+      const d = parseFlexibleDate(selectedUser.starting_date);
+      if (d) {
+        startYear = d.getFullYear();
+        startMonth = d.getMonth();
+      }
     }
     const now = new Date();
     const endYear = now.getFullYear();
@@ -131,13 +134,9 @@ export default function AddPaymentModal({ users = [], locations = [], onClose, o
   // console.log("datasss", clientMonths);
 
 
-  // Helper to format date as DD-MM-YYYY
+  // Helper to format date for backend storage as DD-MM-YYYY
   function formatDate(date) {
-    const d = new Date(date);
-    const day = String(d.getDate()).padStart(2, '0');
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const year = d.getFullYear();
-    return `${day}-${month}-${year}`;
+    return formatStorageDate(date);
   }
 
 
@@ -184,7 +183,7 @@ export default function AddPaymentModal({ users = [], locations = [], onClose, o
                   <span className="font-bold">Phone:</span> {selectedUser.phone}<br />
                   <span className="font-bold">Package:</span> {selectedUser.package_name} <br />
                   <span className="font-bold">Package Price:</span> {selectedUser.package_price}<br />
-                  <span className="font-bold">Starting Date:</span> {formatDate(selectedUser.starting_date)}<br />
+                  <span className="font-bold">Starting Date:</span> {formatDisplayDate(selectedUser.starting_date)}<br />
                   <span className="font-bold">Total Due:</span> {selectedUser.total_due}<br />
                   <span className="font-bold">Total Paid:</span> {selectedUser.total_paid}<br />
                   <span className="font-bold">Notes:</span> {selectedUser.notes}
@@ -201,8 +200,8 @@ export default function AddPaymentModal({ users = [], locations = [], onClose, o
                         // Determine effective start month
                         let startMonth = 0;
                         if (selectedUser.starting_date) {
-                          const sd = new Date(selectedUser.starting_date);
-                          if (!isNaN(sd) && sd.getFullYear() === currentYear) {
+                          const sd = parseFlexibleDate(selectedUser.starting_date);
+                          if (sd && !Number.isNaN(sd) && sd.getFullYear() === currentYear) {
                             startMonth = sd.getMonth();
                           }
                         }

@@ -9,6 +9,7 @@ import {
     pdf,
     Font
 } from '@react-pdf/renderer';
+import { formatDisplayDate } from '@/lib/dateUtils';
 
 Font.register({
     family: 'NotoBengali',
@@ -150,7 +151,7 @@ const UserPDFDocument = ({ user }) => (
                 </View>
                 <View style={styles.userRow}>
                     <Text style={styles.userLabel}>Starting Date:</Text>
-                    <Text style={styles.userValue}>{user?.starting_date ? new Date(user.starting_date).toLocaleDateString() : ''}</Text>
+                    <Text style={styles.userValue}>{formatDisplayDate(user?.starting_date)}</Text>
                 </View>
             </View>
 

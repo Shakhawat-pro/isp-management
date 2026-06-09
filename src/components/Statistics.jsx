@@ -66,6 +66,12 @@ const Statistics = ({ initialData }) => {
     const selectedMonthName = MONTH_NAMES[selectedMonthIndex] || "";
 
     const {
+        originalMonthPaidTotal,
+        originalMonthPaidCount,
+        originalMonthDueTotal,
+        originalMonthDueCount,
+        originalMonthExpectedTotal,
+        originalMonthExpectedUsers,
         selectedMonthPaidTotal,
         selectedMonthPaidCount,
         selectedMonthDueTotal,
@@ -88,8 +94,27 @@ const Statistics = ({ initialData }) => {
                         effectiveStartMonth = 12;
                     }
                 }
+
                 const price = parseFloat(c.package_price) || 0;
-                if (effectiveStartMonth > selectedMonthIndex) return acc;
+                if (effectiveStartMonth <= selectedMonthIndex) {
+                    acc.originalMonthExpectedUsers += 1;
+                    acc.originalMonthExpectedTotal += price;
+
+                    const originalValue = payments[selectedStatsMonth];
+                    const originalPaidAmount = parsePaymentAmount(originalValue);
+                    const originalDueAmount = Math.max(price - originalPaidAmount, 0);
+
+                    if (originalPaidAmount > 0) {
+                        acc.originalMonthPaidTotal += originalPaidAmount;
+                        acc.originalMonthPaidCount += 1;
+                    }
+
+                    if (originalDueAmount > 0) {
+                        acc.originalMonthDueTotal += originalDueAmount;
+                        acc.originalMonthDueCount += 1;
+                    }
+                }
+
                 acc.selectedMonthExpectedUsers += 1;
                 acc.selectedMonthExpectedTotal += price;
                 const v = payments[selectedStatsMonth];
@@ -108,6 +133,12 @@ const Statistics = ({ initialData }) => {
                 return acc;
             },
             {
+                originalMonthPaidTotal: 0,
+                originalMonthPaidCount: 0,
+                originalMonthDueTotal: 0,
+                originalMonthDueCount: 0,
+                originalMonthExpectedTotal: 0,
+                originalMonthExpectedUsers: 0,
                 selectedMonthPaidTotal: 0,
                 selectedMonthPaidCount: 0,
                 selectedMonthDueTotal: 0,
@@ -186,10 +217,14 @@ const Statistics = ({ initialData }) => {
                         <div className="card-body">
                             <h2 className="card-title text-lg font-semibold">Payment</h2>
                             <p className="text-3xl font-bold text-info flex items-center gap-2">
-                                ৳{selectedMonthPaidTotal}
+                                ৳{originalMonthPaidTotal}
                                 <User size={35} className=' border rounded-full p-1' />
                             </p>
-                            <p className="text-sm text-slate-500 mt-1">{selectedMonthPaidCount} users</p>
+                            <p className="text-sm text-slate-500 mt-1">{originalMonthPaidCount} users</p>
+                            {/* Sheet raw data */}
+                            <p>
+                                 Sheet = ৳{selectedMonthPaidTotal} | {selectedMonthPaidCount}
+                            </p>
                         </div>
                     </div>
                     {/* total monthly due */}
